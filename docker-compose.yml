@@ -10,7 +10,7 @@ services:
     ports:
       - "2181:2181"
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/2181 && echo -e 'ruok' >&3 && cat <&3 | grep imok"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -97,7 +97,7 @@ services:
     ports:
       - "5000:5000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/2.0/mlflow/experiments/search?max_results=1"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -156,7 +156,7 @@ services:
                python scripts/init_minio.py &&
                python scripts/seed_demo_data.py &&
                python scripts/ensure_model_exists.py &&
-               faust -A src.data.stream_processor worker &&
+               faust -A src.data.stream_processor worker &
                python src/api/app.py"
                
   grafana:
