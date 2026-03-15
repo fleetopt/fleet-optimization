@@ -15,7 +15,7 @@ Get a complete demo environment running with Docker Compose:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/bayoadejare/fleet-optimization.git
+git clone https://github.com/fleetopt/fleet-optimization.git
 cd fleet-optimization
 
 # 2. Copy environment template
