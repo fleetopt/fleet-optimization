@@ -83,8 +83,28 @@ services:
     networks:
       - fleet-network
 
+  # Initialises MinIO buckets once before the app starts.
+  # Runs once and exits — app depends on service_completed_successfully.
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/mlflow-artifacts &&
+        mc mb --ignore-existing local/fleet-data &&
+        echo 'MinIO buckets ready.'
+      "
+    networks:
+      - fleet-network
+
   mlflow:
-    build: 
+    build:
       context: .
       dockerfile: infrastructure/docker/mlflow/Dockerfile
     environment:
@@ -108,8 +128,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - fleet-network
 
@@ -126,13 +146,14 @@ services:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
       - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin 
+      - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_REGION=us-east-1
       - MLFLOW_S3_USE_PATH_STYLE=true
       - MLFLOW_BUCKET_NAME=mlflow-artifacts
+    # NO bind mount of .:/app — that overwrites the image's installed packages,
+    # including setuptools and all pip dependencies, with the host filesystem.
+    # For live code editing during development use: docker compose exec app bash
     volumes:
-      - .:/app
-      - /app/.venv
       - ./mlflow-artifacts:/app/mlflow-artifacts
     ports:
       - "8000:8000"
@@ -142,21 +163,24 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       mlflow:
         condition: service_healthy
     networks:
       - fleet-network
+    # cleanup_minio.py moved after init_minio.py — can't clean what doesn't exist yet.
+    # Buckets are now pre-created by minio-init, so cleanup_minio.py is a no-op on
+    # first run and correctly clears demo data on subsequent runs.
     command: >
       bash -c "python scripts/wait_for_services.py &&
-               python scripts/cleanup_minio.py &&
                python scripts/init_minio.py &&
+               python scripts/cleanup_minio.py &&
                python scripts/seed_demo_data.py &&
                python scripts/ensure_model_exists.py &&
                faust -A src.data.stream_processor worker &
                python src/api/app.py"
-               
+
   grafana:
     image: grafana/grafana:10.0.3
     environment:
@@ -179,13 +203,8 @@ services:
 
 volumes:
   postgres_data:
-    # Simple named volume - compatible with both Docker and Podman
   minio_data:
-    # Simple named volume - removed problematic driver_opts
-    # For development, this uses default storage
-    # For production, consider external volume with proper storage management
   grafana_data:
-    # Simple named volume - compatible with both
 
 networks:
   fleet-network:
