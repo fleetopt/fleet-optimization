@@ -59,7 +59,7 @@ services:
       start_period: 20s
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/docker/initdb:/docker-entrypoint-initdb.d
+      - ./infrastructure/docker/initdb:/docker-entrypoint-initdb.d:z
     networks:
       - fleet-network
 
