@@ -27,7 +27,7 @@ mlflow==3.9.0rc0         # Model tracking
 # APIs & Web Services
 fastapi==0.111.0
 uvicorn==0.28.0        # Downgraded to compatible version (NOT 0.29.0)
-requests==2.32.4
+requests==2.33.0
 boto3==1.34.0
 
 # Geospatial & Routing
